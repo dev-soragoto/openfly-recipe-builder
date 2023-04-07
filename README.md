@@ -8,6 +8,7 @@ recipe based [openfly](https://github.com/amorphobia/openfly) but delete all lua
 ## how to use?
 
 ```shell
+chmod 775 openfly-recipe-builder
 ./openfly-recipe-builder [read-path] [write-path]
 ```
 

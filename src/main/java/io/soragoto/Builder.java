@@ -40,6 +40,7 @@ public class Builder {
             write(fSet, "openfly.schema.yaml", outPath);
             write(fSet, "openfly-reverse.schema.yaml", outPath);
             write(fSet, "weasel.custom.yaml", outPath);
+            write(fSet, "openfly.symbols.dict.yaml", outPath);
         }
     }
 
@@ -71,7 +72,7 @@ public class Builder {
 
     public static Map<DictTemplate, List<String>> read(final String path) {
 
-        Map<DictTemplate, List<String>> dictMap = Arrays.stream(DictTemplate.values()).collect(Collectors.toMap(Function.identity(),  d -> new ArrayList<>()));
+        Map<DictTemplate, List<String>> dictMap = Arrays.stream(DictTemplate.values()).collect(Collectors.toMap(Function.identity(), d -> new ArrayList<>()));
 
         final var oneCharPattern = "^[^\\x00-\\xff](\\t)+([a-z]|/){4}(\\t+[0-9]*)*+$";
 
@@ -85,11 +86,20 @@ public class Builder {
             }
         } catch (IOException e) {
             LOGGER.warning(e.getClass().getName() + "\t" + e.getMessage());
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(Builder.class.getResourceAsStream("/recipe/openfly.uncommon.dict.yaml"))))) {
+                for (String line = reader.readLine(); line != null; line = reader.readLine()) {
+                    if (Pattern.matches(oneCharPattern, line)) {
+                        dictMap.computeIfAbsent(DictTemplate.REVERSE, d -> new ArrayList<>()).add(line);
+                    }
+                    dictMap.computeIfAbsent(DictTemplate.UNCOMMON, d -> new ArrayList<>()).add(line);
+                }
+            } catch (IOException ex) {
+                LOGGER.warning(ex.getClass().getName() + "\t" + ex.getMessage());
+            }
         }
 
-        try {
-            var symbols = Files.readAllLines(Path.of(path, DictTemplate.SYMBOLS.getFileName()));
-            for (String line : symbols) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(Builder.class.getResourceAsStream("/recipe/openfly.symbols.dict.yaml"))))) {
+            for (String line = reader.readLine(); line != null; line = reader.readLine()) {
                 dictMap.computeIfAbsent(DictTemplate.SYMBOLS, d -> new ArrayList<>()).add(line);
             }
         } catch (IOException e) {
@@ -195,8 +205,6 @@ public class Builder {
                 reverseList.add(String.format("%s\t%s", p[0], new String(new char[]{'`', '`', code[2], '`'})));
                 reverseList.add(String.format("%s\t%s", p[0], new String(new char[]{'`', code[1], '`', '`'})));
                 reverseList.add(String.format("%s\t%s", p[0], new String(new char[]{code[0], '`', '`', '`'})));
-
-
             }
         }
 
