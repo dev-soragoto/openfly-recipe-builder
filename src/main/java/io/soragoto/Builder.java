@@ -76,28 +76,6 @@ public class Builder {
 
         final var oneCharPattern = "^[^\\x00-\\xff](\\t)+([a-z]|/){4}(\\t+[0-9]*)*+$";
 
-        try {
-            var uncommon = Files.readAllLines(Path.of(path, DictTemplate.UNCOMMON.getFileName()));
-            for (String line : uncommon) {
-                if (Pattern.matches(oneCharPattern, line)) {
-                    dictMap.computeIfAbsent(DictTemplate.REVERSE, d -> new ArrayList<>()).add(line);
-                }
-                dictMap.computeIfAbsent(DictTemplate.UNCOMMON, d -> new ArrayList<>()).add(line);
-            }
-        } catch (IOException e) {
-            LOGGER.warning(e.getClass().getName() + "\t" + e.getMessage());
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(Builder.class.getResourceAsStream("/recipe/openfly.uncommon.dict.yaml"))))) {
-                for (String line = reader.readLine(); line != null; line = reader.readLine()) {
-                    if (Pattern.matches(oneCharPattern, line)) {
-                        dictMap.computeIfAbsent(DictTemplate.REVERSE, d -> new ArrayList<>()).add(line);
-                    }
-                    dictMap.computeIfAbsent(DictTemplate.UNCOMMON, d -> new ArrayList<>()).add(line);
-                }
-            } catch (IOException ex) {
-                LOGGER.warning(ex.getClass().getName() + "\t" + ex.getMessage());
-            }
-        }
-
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(Builder.class.getResourceAsStream("/recipe/openfly.symbols.dict.yaml"))))) {
             for (String line = reader.readLine(); line != null; line = reader.readLine()) {
                 dictMap.computeIfAbsent(DictTemplate.SYMBOLS, d -> new ArrayList<>()).add(line);
@@ -118,23 +96,8 @@ public class Builder {
             LOGGER.warning(e.getClass().getName() + "\t" + e.getMessage());
         }
 
-        try {
-            var user = Files.readAllLines(Path.of(path, DictTemplate.USER.getFileName()));
-            for (String line : user) {
-                if (Pattern.matches(oneCharPattern, line)) {
-                    dictMap.computeIfAbsent(DictTemplate.REVERSE, d -> new ArrayList<>()).add(line);
-                }
-                dictMap.computeIfAbsent(DictTemplate.USER, d -> new ArrayList<>()).add(line);
-            }
-        } catch (IOException e) {
-            LOGGER.warning(e.getClass().getName() + "\t" + e.getMessage());
-        }
-
-        Path dictPath;
-
         try (var s = Files.list(Path.of(path))) {
-            dictPath = s.filter(p -> !Files.isDirectory(p) && p.getFileName().toString().endsWith(".txt"))
-                    .findFirst().orElseThrow(() -> new NoSuchFileException("end with .txt"));
+            var dictPath = s.filter(p -> !Files.isDirectory(p) && p.getFileName().toString().endsWith(".txt")).findFirst().orElseThrow(() -> new NoSuchFileException("end with .txt"));
 
             var table = Files.readAllLines(dictPath);
 
@@ -178,6 +141,40 @@ public class Builder {
             }
         } catch (IOException e) {
             LOGGER.warning(e.getClass().getName() + "\t" + e.getMessage());
+        }
+
+        try {
+            var user = Files.readAllLines(Path.of(path, DictTemplate.USER.getFileName()));
+            for (String line : user) {
+                if (Pattern.matches(oneCharPattern, line)) {
+                    dictMap.computeIfAbsent(DictTemplate.REVERSE, d -> new ArrayList<>()).add(line);
+                }
+                dictMap.computeIfAbsent(DictTemplate.USER, d -> new ArrayList<>()).add(line);
+            }
+        } catch (IOException e) {
+            LOGGER.warning(e.getClass().getName() + "\t" + e.getMessage());
+        }
+
+        try {
+            var uncommon = Files.readAllLines(Path.of(path, DictTemplate.UNCOMMON.getFileName()));
+            for (String line : uncommon) {
+                if (Pattern.matches(oneCharPattern, line)) {
+                    dictMap.computeIfAbsent(DictTemplate.REVERSE, d -> new ArrayList<>()).add(line);
+                }
+                dictMap.computeIfAbsent(DictTemplate.UNCOMMON, d -> new ArrayList<>()).add(line);
+            }
+        } catch (IOException e) {
+            LOGGER.warning(e.getClass().getName() + "\t" + e.getMessage());
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(Builder.class.getResourceAsStream("/recipe/openfly.uncommon.dict.yaml"))))) {
+                for (String line = reader.readLine(); line != null; line = reader.readLine()) {
+                    if (Pattern.matches(oneCharPattern, line)) {
+                        dictMap.computeIfAbsent(DictTemplate.REVERSE, d -> new ArrayList<>()).add(line);
+                    }
+                    dictMap.computeIfAbsent(DictTemplate.UNCOMMON, d -> new ArrayList<>()).add(line);
+                }
+            } catch (IOException ex) {
+                LOGGER.warning(ex.getClass().getName() + "\t" + ex.getMessage());
+            }
         }
 
         var reverseTable = dictMap.get(DictTemplate.REVERSE);
