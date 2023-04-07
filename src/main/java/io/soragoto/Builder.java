@@ -7,7 +7,13 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
@@ -155,9 +161,16 @@ public class Builder {
             LOGGER.warning(e.getClass().getName() + "\t" + e.getMessage());
         }
 
+        var set = dictMap.get(DictTemplate.REVERSE).stream().map(l -> l.split("\\t+")[0]).collect(Collectors.toSet());
+
         try {
             var uncommon = Files.readAllLines(Path.of(path, DictTemplate.UNCOMMON.getFileName()));
             for (String line : uncommon) {
+                var c = line.split("\\t+")[0];
+                if (set.contains(c)) {
+                    LOGGER.warning(c + " is already in dict");
+                }
+
                 if (Pattern.matches(oneCharPattern, line)) {
                     dictMap.computeIfAbsent(DictTemplate.REVERSE, d -> new ArrayList<>()).add(line);
                 }
@@ -177,13 +190,14 @@ public class Builder {
             }
         }
 
+
         var reverseTable = dictMap.get(DictTemplate.REVERSE);
 
         List<String> reverseList = new ArrayList<>();
 
         if (reverseTable != null) {
             for (String line : reverseTable) {
-                var p = line.split("\t+");
+                var p = line.split("\\t+");
                 var code = p[1].toCharArray();
 
                 reverseList.add(String.format("%s\t%s", p[0], new String(new char[]{'`', code[1], code[2], code[3]})));
