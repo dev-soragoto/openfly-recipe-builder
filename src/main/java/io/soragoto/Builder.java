@@ -7,13 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
@@ -23,15 +17,13 @@ import static java.nio.file.StandardOpenOption.APPEND;
 
 public class Builder {
 
-    private static final String PATH = Optional.ofNullable(System.getenv("RECIPE_PATH")).orElse("./");
-    private static final String OUT_PATH = Optional.ofNullable(System.getenv("RECIPE_OUT_PATH")).orElse("./");
 
     private static final Logger LOGGER = Logger.getLogger(Builder.class.getName());
 
     public static void main(String[] args) throws IOException {
 
-        var path = args.length > 0 ? args[0] : PATH;
-        var outPath = args.length > 1 ? args[1] : OUT_PATH;
+        var path = args.length > 0 ? args[0] : "./";
+        var outPath = args.length > 1 ? args[1] : "./";
 
         var dict = read(path);
 

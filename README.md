@@ -12,3 +12,5 @@ chmod 775 openfly-recipe-builder
 ./openfly-recipe-builder [read-path] [write-path]
 ```
 
+read-path write-path default ./
+

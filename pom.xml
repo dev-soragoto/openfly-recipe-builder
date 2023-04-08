@@ -42,6 +42,7 @@
                 <configuration>
                     <fallback>false</fallback>
                     <resourceIncludedPatterns>.*</resourceIncludedPatterns>
+                    <buildArgs>--static --libc=musl</buildArgs>
                 </configuration>
             </plugin>
         </plugins>
