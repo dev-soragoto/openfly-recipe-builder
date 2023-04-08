@@ -12,4 +12,4 @@ chmod 775 openfly-recipe-builder
 ./openfly-recipe-builder [read-path] [write-path]
 ```
 
-read-path write-path default `./` so you can copy openfly-recipe-builder in to your rime user folder and run it
+read-path write-path default `./` so you can copy openfly-recipe-builder and official dict used on sougo into your rime user folder and run it

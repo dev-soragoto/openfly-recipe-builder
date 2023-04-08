@@ -41,7 +41,7 @@
                 </executions>
                 <configuration>
                     <fallback>false</fallback>
-                    <resourceIncludedPatterns>.*</resourceIncludedPatterns>
+                    <resourceIncludedPatterns>recipe/.*\.yaml</resourceIncludedPatterns>
                     <buildArgs>--static --libc=musl</buildArgs>
                 </configuration>
             </plugin>

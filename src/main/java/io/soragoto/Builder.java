@@ -72,11 +72,14 @@ public class Builder {
 
         Map<DictTemplate, List<String>> dictMap = Arrays.stream(DictTemplate.values()).collect(Collectors.toMap(Function.identity(), d -> new ArrayList<>()));
 
-        final var oneCharPattern = "^[^\\x00-\\xff](\\t)+([a-z]|/){4}(\\t+[0-9]*)*+$";
+        final var oneCharPattern = "^[^\\x00-\\xff]\\t+([a-z]|/){4}(\\t+[0-9]+)?$";
+        final var pattern = "^.+\\t+([a-z]|/){1,4}(\\t+[0-9]+)?$";
 
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(Builder.class.getResourceAsStream("/recipe/openfly.symbols.dict.yaml"))))) {
             for (String line = reader.readLine(); line != null; line = reader.readLine()) {
-                dictMap.computeIfAbsent(DictTemplate.SYMBOLS, d -> new ArrayList<>()).add(line);
+                if (Pattern.matches(pattern, line)) {
+                    dictMap.computeIfAbsent(DictTemplate.SYMBOLS, d -> new ArrayList<>()).add(line);
+                }
             }
         } catch (IOException e) {
             LOGGER.warning(e.getClass().getName() + "\t" + e.getMessage());
@@ -88,7 +91,9 @@ public class Builder {
                 if (Pattern.matches(oneCharPattern, line)) {
                     dictMap.computeIfAbsent(DictTemplate.REVERSE, d -> new ArrayList<>()).add(line);
                 }
-                dictMap.computeIfAbsent(DictTemplate.USER_TOP, d -> new ArrayList<>()).add(line);
+                if (Pattern.matches(pattern, line)) {
+                    dictMap.computeIfAbsent(DictTemplate.USER_TOP, d -> new ArrayList<>()).add(line);
+                }
             }
         } catch (IOException e) {
             LOGGER.warning(e.getClass().getName() + "\t" + e.getMessage());
@@ -147,7 +152,10 @@ public class Builder {
                 if (Pattern.matches(oneCharPattern, line)) {
                     dictMap.computeIfAbsent(DictTemplate.REVERSE, d -> new ArrayList<>()).add(line);
                 }
-                dictMap.computeIfAbsent(DictTemplate.USER, d -> new ArrayList<>()).add(line);
+
+                if (Pattern.matches(pattern, line)) {
+                    dictMap.computeIfAbsent(DictTemplate.USER, d -> new ArrayList<>()).add(line);
+                }
             }
         } catch (IOException e) {
             LOGGER.warning(e.getClass().getName() + "\t" + e.getMessage());
@@ -166,7 +174,10 @@ public class Builder {
                 if (Pattern.matches(oneCharPattern, line)) {
                     dictMap.computeIfAbsent(DictTemplate.REVERSE, d -> new ArrayList<>()).add(line);
                 }
-                dictMap.computeIfAbsent(DictTemplate.UNCOMMON, d -> new ArrayList<>()).add(line);
+
+                if (Pattern.matches(pattern, line)) {
+                    dictMap.computeIfAbsent(DictTemplate.UNCOMMON, d -> new ArrayList<>()).add(line);
+                }
             }
         } catch (IOException e) {
             LOGGER.warning(e.getClass().getName() + "\t" + e.getMessage());
@@ -175,7 +186,10 @@ public class Builder {
                     if (Pattern.matches(oneCharPattern, line)) {
                         dictMap.computeIfAbsent(DictTemplate.REVERSE, d -> new ArrayList<>()).add(line);
                     }
-                    dictMap.computeIfAbsent(DictTemplate.UNCOMMON, d -> new ArrayList<>()).add(line);
+
+                    if (Pattern.matches(pattern, line)) {
+                        dictMap.computeIfAbsent(DictTemplate.UNCOMMON, d -> new ArrayList<>()).add(line);
+                    }
                 }
             } catch (IOException ex) {
                 LOGGER.warning(ex.getClass().getName() + "\t" + ex.getMessage());
