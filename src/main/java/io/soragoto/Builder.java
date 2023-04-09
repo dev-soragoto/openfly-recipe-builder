@@ -3,12 +3,17 @@ package io.soragoto;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.function.Function;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -16,92 +21,38 @@ import java.util.stream.Collectors;
 import static java.nio.file.StandardOpenOption.APPEND;
 
 public class Builder {
+    private static final String ONE_CHAR_PATTERN = "^[^\\x00-\\xff]\\t+([a-z]|/){4}(\\t+[0-9]+)?$";
+    private static final String PATTERN = "^.+\\t+([a-z]|/){1,4}(\\t+[0-9]+)?$";
+    private static final String PATH = "./";
+    private static final ExecutorService EXECUTOR = Executors.newCachedThreadPool();
+    private static final List<String> ONE_CHAR_DICT = Collections.synchronizedList(new ArrayList<>());
 
+    public static void main(String[] args) throws ExecutionException, InterruptedException {
 
-    private static final Logger LOGGER = Logger.getLogger(Builder.class.getName());
-
-    public static void main(String[] args) throws IOException {
-
-        var path = args.length > 0 ? args[0] : "./";
-        var outPath = args.length > 1 ? args[1] : "./";
-
-        var dict = read(path);
-
-        for (Map.Entry<DictTemplate, List<String>> e : dict.entrySet()) {
-            write(e.getKey(), e.getValue(), outPath);
-        }
-
-        try (var s = Files.list(Path.of(outPath))) {
-            var fSet = s.filter(p -> !Files.isDirectory(p)).map(p -> p.getFileName().toString()).collect(Collectors.toSet());
-            write(fSet, "default.custom.yaml", outPath);
-            write(fSet, "openfly.dict.yaml", outPath);
-            write(fSet, "openfly.schema.yaml", outPath);
-            write(fSet, "openfly-reverse.schema.yaml", outPath);
-            write(fSet, "weasel.custom.yaml", outPath);
-            write(fSet, "openfly.symbols.dict.yaml", outPath);
-        }
-    }
-
-
-    public static void write(Set<String> fSet, String name, String outPath) throws IOException {
-        if (!fSet.contains(name)) {
-            var filePath = Paths.get(outPath, name);
-            Files.createFile(filePath);
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(Builder.class.getResourceAsStream("/recipe/" + name))))) {
-                for (String line = reader.readLine(); line != null; line = reader.readLine()) {
-                    Files.writeString(filePath, line, APPEND);
-                    Files.writeString(filePath, "\n", APPEND);
-                }
+        List<Future<?>> futures = new ArrayList<>();
+        futures.add(EXECUTOR.submit(() -> {
+            try (var s = Files.list(Path.of(PATH))) {
+                var fSet = s.filter(p -> !Files.isDirectory(p)).map(p -> p.getFileName().toString()).collect(Collectors.toSet());
+                writeByResource(fSet, "default.custom.yaml");
+                writeByResource(fSet, "openfly.dict.yaml");
+                writeByResource(fSet, "openfly.schema.yaml");
+                writeByResource(fSet, "openfly-reverse.schema.yaml");
+                writeByResource(fSet, "weasel.custom.yaml");
+                writeByResource(fSet, DictTemplate.SYMBOLS.getFileName());
+            } catch (IOException e) {
+                log(Level.SEVERE, e);
             }
-        }
-    }
+        }));
 
-    public static void write(DictTemplate template, List<String> dict, String path) throws IOException {
-        var filePath = Paths.get(path, template.getFileName());
-        Files.deleteIfExists(filePath);
-        Files.createFile(filePath);
-        Files.writeString(filePath, template.getTemplate(), APPEND);
-        for (String l : dict) {
-            Files.writeString(filePath, l, APPEND);
-            Files.writeString(filePath, "\n", APPEND);
-        }
-    }
+        var read1 = EXECUTOR.submit(() -> readAndWriteUserDict(DictTemplate.USER_TOP));
+        var read2 = EXECUTOR.submit(() -> readAndWriteUserDict(DictTemplate.USER));
 
 
-    public static Map<DictTemplate, List<String>> read(final String path) {
+        try (var s = Files.list(Path.of(PATH))) {
 
-        Map<DictTemplate, List<String>> dictMap = Arrays.stream(DictTemplate.values()).collect(Collectors.toMap(Function.identity(), d -> new ArrayList<>()));
+            Map<DictTemplate, List<String>> dictMap = new HashMap<>();
 
-        final var oneCharPattern = "^[^\\x00-\\xff]\\t+([a-z]|/){4}(\\t+[0-9]+)?$";
-        final var pattern = "^.+\\t+([a-z]|/){1,4}(\\t+[0-9]+)?$";
-
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(Builder.class.getResourceAsStream("/recipe/openfly.symbols.dict.yaml"))))) {
-            for (String line = reader.readLine(); line != null; line = reader.readLine()) {
-                if (Pattern.matches(pattern, line)) {
-                    dictMap.computeIfAbsent(DictTemplate.SYMBOLS, d -> new ArrayList<>()).add(line);
-                }
-            }
-        } catch (IOException e) {
-            LOGGER.warning(e.getClass().getName() + "\t" + e.getMessage());
-        }
-
-        try {
-            var userTop = Files.readAllLines(Path.of(path, DictTemplate.USER_TOP.getFileName()));
-            for (String line : userTop) {
-                if (Pattern.matches(oneCharPattern, line)) {
-                    dictMap.computeIfAbsent(DictTemplate.REVERSE, d -> new ArrayList<>()).add(line);
-                }
-                if (Pattern.matches(pattern, line)) {
-                    dictMap.computeIfAbsent(DictTemplate.USER_TOP, d -> new ArrayList<>()).add(line);
-                }
-            }
-        } catch (IOException e) {
-            LOGGER.warning(e.getClass().getName() + "\t" + e.getMessage());
-        }
-
-        try (var s = Files.list(Path.of(path))) {
             var dictPath = s.filter(p -> !Files.isDirectory(p) && p.getFileName().toString().endsWith(".txt")).findFirst().orElseThrow(() -> new NoSuchFileException("end with .txt"));
-
             var table = Files.readAllLines(dictPath);
 
             var current = "";
@@ -111,98 +62,108 @@ public class Builder {
                 } else {
                     if (current.contains("首选")) {
                         dictMap.computeIfAbsent(DictTemplate.PRIMARY, d -> new ArrayList<>()).add(line);
-                        if (Pattern.matches(oneCharPattern, line)) {
-                            dictMap.computeIfAbsent(DictTemplate.REVERSE, d -> new ArrayList<>()).add(line);
+                        if (Pattern.matches(ONE_CHAR_PATTERN, line)) {
+                            ONE_CHAR_DICT.add(line);
                         }
                     } else if (current.contains("二重")) {
                         dictMap.computeIfAbsent(DictTemplate.SECONDARY_SHORT_CODE, d -> new ArrayList<>()).add(line);
-                        if (Pattern.matches(oneCharPattern, line)) {
-                            dictMap.computeIfAbsent(DictTemplate.REVERSE, d -> new ArrayList<>()).add(line);
+                        if (Pattern.matches(ONE_CHAR_PATTERN, line)) {
+                            ONE_CHAR_DICT.add(line);
                         }
                     } else if (current.contains("次选")) {
                         dictMap.computeIfAbsent(DictTemplate.SECONDARY, d -> new ArrayList<>()).add(line);
-                        if (Pattern.matches(oneCharPattern, line)) {
-                            dictMap.computeIfAbsent(DictTemplate.REVERSE, d -> new ArrayList<>()).add(line);
+
+                        if (Pattern.matches(ONE_CHAR_PATTERN, line)) {
+                            ONE_CHAR_DICT.add(line);
                         }
+
                     } else if (current.contains("填空")) {
                         dictMap.computeIfAbsent(DictTemplate.VOID, d -> new ArrayList<>()).add(line);
-                        if (Pattern.matches(oneCharPattern, line)) {
-                            dictMap.computeIfAbsent(DictTemplate.REVERSE, d -> new ArrayList<>()).add(line);
+                        if (Pattern.matches(ONE_CHAR_PATTERN, line)) {
+                            ONE_CHAR_DICT.add(line);
                         }
+
                     } else if (current.contains("表外")) {
                         dictMap.computeIfAbsent(DictTemplate.OFF_TABLE, d -> new ArrayList<>()).add(line);
-                        if (Pattern.matches(oneCharPattern, line)) {
-                            dictMap.computeIfAbsent(DictTemplate.REVERSE, d -> new ArrayList<>()).add(line);
+                        if (Pattern.matches(ONE_CHAR_PATTERN, line)) {
+                            ONE_CHAR_DICT.add(line);
                         }
+
                     } else if (current.contains("随心")) {
                         dictMap.computeIfAbsent(DictTemplate.WHIMSICALITY, d -> new ArrayList<>()).add(line);
-                        if (Pattern.matches(oneCharPattern, line)) {
-                            dictMap.computeIfAbsent(DictTemplate.REVERSE, d -> new ArrayList<>()).add(line);
+                        if (Pattern.matches(ONE_CHAR_PATTERN, line)) {
+                            ONE_CHAR_DICT.add(line);
                         }
                     }
                 }
             }
+
+            dictMap.forEach((t, d) -> futures.add(EXECUTOR.submit(() -> write(t, d))));
         } catch (IOException e) {
-            LOGGER.warning(e.getClass().getName() + "\t" + e.getMessage());
+            log(Level.WARNING, e);
         }
 
-        try {
-            var user = Files.readAllLines(Path.of(path, DictTemplate.USER.getFileName()));
-            for (String line : user) {
-                if (Pattern.matches(oneCharPattern, line)) {
-                    dictMap.computeIfAbsent(DictTemplate.REVERSE, d -> new ArrayList<>()).add(line);
-                }
 
-                if (Pattern.matches(pattern, line)) {
-                    dictMap.computeIfAbsent(DictTemplate.USER, d -> new ArrayList<>()).add(line);
-                }
-            }
-        } catch (IOException e) {
-            LOGGER.warning(e.getClass().getName() + "\t" + e.getMessage());
-        }
+        List<String> uncommon = new ArrayList<>();
+        var chars = ONE_CHAR_DICT.stream().map(l -> l.split("\\t+")[0]).collect(Collectors.toSet());
 
-        var set = dictMap.get(DictTemplate.REVERSE).stream().map(l -> l.split("\\t+")[0]).collect(Collectors.toSet());
 
         try {
-            var uncommon = Files.readAllLines(Path.of(path, DictTemplate.UNCOMMON.getFileName()));
-            for (String line : uncommon) {
+            var uncommonFile = Files.readAllLines(Path.of(PATH, DictTemplate.UNCOMMON.getFileName()));
+            for (String line : uncommonFile) {
                 var c = line.split("\\t+")[0];
-                if (set.contains(c)) {
-                    LOGGER.warning(c + " is already in dict");
+                if (chars.contains(c)) {
+                    Logger.getGlobal().warning(c + " is already in dict");
                 }
-
-                if (Pattern.matches(oneCharPattern, line)) {
-                    dictMap.computeIfAbsent(DictTemplate.REVERSE, d -> new ArrayList<>()).add(line);
-                }
-
-                if (Pattern.matches(pattern, line)) {
-                    dictMap.computeIfAbsent(DictTemplate.UNCOMMON, d -> new ArrayList<>()).add(line);
+                if (Pattern.matches(PATTERN, line)) {
+                    uncommon.add(line);
+                    if (Pattern.matches(ONE_CHAR_PATTERN, line)) {
+                        ONE_CHAR_DICT.add(line);
+                    }
                 }
             }
         } catch (IOException e) {
-            LOGGER.warning(e.getClass().getName() + "\t" + e.getMessage());
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(Builder.class.getResourceAsStream("/recipe/openfly.uncommon.dict.yaml"))))) {
+            log(Level.WARNING, e);
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                    Objects.requireNonNull(Builder.class.getResourceAsStream("/recipe/" + DictTemplate.UNCOMMON.getFileName())), StandardCharsets.UTF_8
+            ))) {
                 for (String line = reader.readLine(); line != null; line = reader.readLine()) {
-                    if (Pattern.matches(oneCharPattern, line)) {
-                        dictMap.computeIfAbsent(DictTemplate.REVERSE, d -> new ArrayList<>()).add(line);
-                    }
 
-                    if (Pattern.matches(pattern, line)) {
-                        dictMap.computeIfAbsent(DictTemplate.UNCOMMON, d -> new ArrayList<>()).add(line);
+                    if (Pattern.matches(PATTERN, line)) {
+                        uncommon.add(line);
+                        if (Pattern.matches(ONE_CHAR_PATTERN, line)) {
+                            ONE_CHAR_DICT.add(line);
+                        }
                     }
                 }
             } catch (IOException ex) {
-                LOGGER.warning(ex.getClass().getName() + "\t" + ex.getMessage());
+                log(Level.WARNING, ex);
             }
         }
 
+        futures.add(EXECUTOR.submit(() -> write(DictTemplate.UNCOMMON, uncommon)));
 
-        var reverseTable = dictMap.get(DictTemplate.REVERSE);
+        read1.get();
+        read2.get();
 
+        var reverse = buildReverse();
+        write(DictTemplate.REVERSE, reverse);
+
+
+        for (Future<?> future : futures) {
+            future.get();
+        }
+
+        EXECUTOR.shutdown();
+        Logger.getGlobal().info("done");
+    }
+
+
+    public static List<String> buildReverse() {
         List<String> reverseList = new ArrayList<>();
 
-        if (reverseTable != null) {
-            for (String line : reverseTable) {
+        if (!ONE_CHAR_DICT.isEmpty()) {
+            for (String line : ONE_CHAR_DICT) {
                 var p = line.split("\\t+");
                 var code = p[1].toCharArray();
 
@@ -224,10 +185,65 @@ public class Builder {
                 reverseList.add(String.format("%s\t%s", p[0], new String(new char[]{code[0], '`', '`', '`'})));
             }
         }
+        return reverseList;
+    }
 
-        dictMap.put(DictTemplate.REVERSE, reverseList);
+    public static void readAndWriteUserDict(DictTemplate template) {
+        Logger.getGlobal().info("reading " + template.getFileName());
+        List<String> result = new ArrayList<>();
+        try {
+            for (String line : Files.readAllLines(Path.of(PATH, template.getFileName()))) {
+                if (Pattern.matches(PATTERN, line)) {
+                    result.add(line);
+                    if (Pattern.matches(ONE_CHAR_PATTERN, line)) {
+                        ONE_CHAR_DICT.add(line);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            log(Level.WARNING, e);
+        }
 
-        return dictMap;
+        Logger.getGlobal().info("read " + template.getFileName() + "success");
+        write(template, result);
+    }
+
+
+    public static void writeByResource(Set<String> fSet, String name) throws IOException {
+        if (!fSet.contains(name)) {
+            var filePath = Paths.get(PATH, name);
+            Files.createFile(filePath);
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                    Objects.requireNonNull(Builder.class.getResourceAsStream("/recipe/" + name)), StandardCharsets.UTF_8
+            ))) {
+                for (String line = reader.readLine(); line != null; line = reader.readLine()) {
+                    Files.writeString(filePath, line, APPEND);
+                    Files.writeString(filePath, "\n", APPEND);
+                }
+            }
+        }
+    }
+
+    public static void write(DictTemplate template, List<String> dict) {
+        Logger.getGlobal().info("writing into " + template.getFileName());
+        var fileName = Paths.get(PATH, template.getFileName());
+        try {
+            Files.deleteIfExists(fileName);
+            Files.createFile(fileName);
+            Files.writeString(fileName, template.getTemplate(), APPEND);
+            for (String l : dict) {
+                Files.writeString(fileName, l, APPEND);
+                Files.writeString(fileName, "\n", APPEND);
+            }
+        } catch (IOException e) {
+            log(Level.WARNING, e);
+        }
+
+        Logger.getGlobal().info("writing " + template.getFileName() + " success");
+    }
+
+    private static void log(Level level, Throwable t) {
+        Logger.getGlobal().log(level, t.getClass().getName(), t);
     }
 
 }
