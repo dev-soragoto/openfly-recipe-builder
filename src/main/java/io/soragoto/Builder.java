@@ -143,6 +143,19 @@ public class Builder {
 
         futures.add(EXECUTOR.submit(() -> write(DictTemplate.UNCOMMON, uncommon)));
 
+        // load local full char
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                Objects.requireNonNull(Builder.class.getResourceAsStream("/recipe/flypy_full.txt")), StandardCharsets.UTF_8
+        ))) {
+            for (String line = reader.readLine(); line != null; line = reader.readLine()) {
+                if (Pattern.matches(ONE_CHAR_PATTERN, line)) {
+                    ONE_CHAR_DICT.add(line);
+                }
+            }
+        } catch (IOException ex) {
+            log(Level.WARNING, ex);
+        }
+
         read1.get();
         read2.get();
 
