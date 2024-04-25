@@ -35,14 +35,12 @@ public enum DictTemplate {
                 # encoding: utf-8
                 #
                 # %s
-                                    
                 ---
                 name: %s
                 version: "%s"
                 sort: by_weight
                 use_preset_vocabulary: false
                 ...
-                    
                 """, _description, _name, _version);
     }
 
