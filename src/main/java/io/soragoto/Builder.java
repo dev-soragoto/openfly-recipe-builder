@@ -53,7 +53,7 @@ public class Builder {
             Map<DictTemplate, List<String>> dictMap = new HashMap<>();
 
             var dictPath = s.filter(p -> !Files.isDirectory(p) && p.getFileName().toString().endsWith(".txt")).findFirst().orElseThrow(() -> new NoSuchFileException("end with .txt"));
-            var table = Files.readAllLines(dictPath);
+            var table = Files.readAllLines(dictPath, StandardCharsets.UTF_16LE);
 
             var current = "";
             for (String line : table) {
